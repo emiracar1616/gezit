@@ -1,0 +1,7 @@
+{
+  "appId": "com.emirhan.gezihesabi",
+  "appName": "Gezi Hesabı",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" },
+  "android": { "adjustMarginsForEdgeToEdge": "auto" }
+}

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Gezi Hesabı</title>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Gezi Hesabı</h1>
+    <p class="sub">Arkadaşlarınla ortak harcamaları gir, kim kime ne ödeyecek herkesin ekranında görünsün.</p>
+    <p class="sub" id="whoami" style="margin-top:2px"></p>
+  </header>
+
+  <div id="notice" class="panel notice" hidden></div>
+  <div id="banner" class="banner" hidden></div>
+
+  <!-- Giriş / Kayıt -->
+  <section id="screenAuth" class="authwrap" hidden>
+    <div class="panel lead">
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-mode="login">Giriş yap</button>
+        <button type="button" class="tab" data-mode="register">Kayıt ol</button>
+      </div>
+      <form id="authForm" novalidate>
+        <div id="nameRow" hidden>
+          <label for="authName">Adın</label>
+          <input id="authName" maxlength="40" autocomplete="name" placeholder="Ad Soyad" enterkeyhint="next">
+        </div>
+        <label for="authEmail">E-posta</label>
+        <input id="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="ornek@mail.com" enterkeyhint="next">
+        <label for="authPass">Şifre</label>
+        <input id="authPass" type="password" autocomplete="current-password" placeholder="En az 6 karakter" enterkeyhint="done">
+        <div style="margin-top:16px"><button type="submit" id="authBtn">Giriş yap</button></div>
+        <div class="msg" id="authMsg"></div>
+        <button type="button" class="linkbtn" id="resetBtn">Şifremi unuttum</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Gezilerim -->
+  <main id="screenList" class="grid" hidden>
+    <div class="col">
+      <section class="panel">
+        <h2>Yeni gezi</h2>
+        <label for="newTripName" style="margin-top:0">Gezinin adı</label>
+        <input id="newTripName" placeholder="Bodrum hafta sonu" maxlength="50" autocomplete="off" enterkeyhint="done">
+        <label for="newTripCur">Para birimi</label>
+        <select id="newTripCur">
+          <option value="₺">₺ TL</option>
+          <option value="€">€ Euro</option>
+          <option value="$">$ Dolar</option>
+          <option value="£">£ Sterlin</option>
+        </select>
+        <div style="margin-top:16px"><button type="button" id="createTripBtn">Gezi oluştur</button></div>
+        <div class="msg" id="createMsg"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Arkadaşlarımı nasıl eklerim?</h2>
+        <ol class="howto">
+          <li>Arkadaşın uygulamayı kurup kendi e-postasıyla <strong>kayıt olur</strong>.</li>
+          <li>Sen gezini açıp <strong>Kişi ekle</strong> kutusuna onun e-posta adresini yazarsın.</li>
+          <li>Bulunca <strong>Ekle</strong>'ye basarsın, gezi onun ekranında da görünür.</li>
+        </ol>
+      </section>
+
+      <section class="panel">
+        <h2>Hesabım</h2>
+        <p class="muted" id="acctEmail" style="margin:0"></p>
+        <label for="acctName">Görünen ad</label>
+        <input id="acctName" maxlength="40" autocomplete="name">
+        <div class="row" style="margin-top:12px">
+          <button type="button" class="ghost" id="saveNameBtn">Adı kaydet</button>
+          <button type="button" class="ghost" id="logoutBtn">Çıkış yap</button>
+        </div>
+        <div class="msg" id="acctMsg"></div>
+        <details class="danger-zone">
+          <summary>Hesabı sil</summary>
+          <p class="muted">Hesabını silmek için önce tüm gezilerden ayrılmış ya da onları silmiş olmalısın. Bu işlem geri alınamaz.</p>
+          <label for="delPass">Şifren</label>
+          <input id="delPass" type="password" autocomplete="current-password">
+          <div style="margin-top:12px"><button type="button" class="ghost danger" id="delAcctBtn">Hesabımı kalıcı olarak sil</button></div>
+          <div class="msg" id="delMsg"></div>
+        </details>
+      </section>
+    </div>
+    <div class="col">
+      <section class="panel lead">
+        <h2>Gezilerim</h2>
+        <div id="tripList"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Gezi ayrıntısı -->
+  <section id="screenTrip" hidden>
+    <div class="topbar">
+      <button type="button" class="ghost small" id="backBtn">← Gezilerim</button>
+      <h2 id="tripTitle"></h2>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <section class="panel">
+          <h2>Kişiler</h2>
+          <div class="chips" id="members" style="margin-top:0"></div>
+          <div id="addMemberBox">
+            <label for="memberEmail">Kişi ekle (e-posta ile)</label>
+            <div class="row">
+              <input id="memberEmail" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="arkadas@mail.com" enterkeyhint="search">
+              <button type="button" id="memberFindBtn">Bul</button>
+            </div>
+            <div class="results" id="memberResults"></div>
+            <p class="hint" id="memberHint"></p>
+          </div>
+          <div class="msg" id="memberMsg"></div>
+        </section>
+
+        <section class="panel">
+          <h2 id="formTitle">Harcama ekle</h2>
+          <div id="expenseForm">
+            <label for="desc" style="margin-top:0">Ne için?</label>
+            <input id="desc" placeholder="Akşam yemeği, benzin, otel" maxlength="60" autocomplete="off">
+            <label for="amount">Tutar</label>
+            <input id="amount" inputmode="decimal" placeholder="0,00" autocomplete="off">
+            <p class="hint" id="amtHint"></p>
+            <label for="payer">Kim ödedi?</label>
+            <select id="payer"></select>
+            <label>Kimler arasında bölünsün?</label>
+            <div class="checks" id="among"></div>
+            <div class="row" style="margin-top:16px">
+              <button type="button" id="addExpenseBtn">Harcamayı ekle</button>
+              <button type="button" class="ghost" id="cancelEditBtn" hidden>Vazgeç</button>
+            </div>
+            <div class="msg" id="expMsg"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="panel lead">
+          <div class="hero" id="hero"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Ödemeler</h2>
+          <p class="muted" style="margin:-6px 0 12px">Az sayıda ödemeyle herkesin hesabı kapanır.</p>
+          <div id="settle"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Kim ne durumda</h2>
+          <div id="balances"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Harcamalar</h2>
+          <div id="expenses"></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel tools">
+      <div class="toolbar">
+        <button class="ghost" id="copyBtn" type="button">Özeti kopyala</button>
+        <div class="spacer"></div>
+        <button class="ghost" id="leaveBtn" type="button" hidden>Geziden ayrıl</button>
+        <button class="ghost danger" id="deleteTripBtn" type="button" hidden>Geziyi sil</button>
+      </div>
+      <div class="msg" id="toolMsg"></div>
+      <textarea id="copyOut" class="copyout" readonly rows="6"></textarea>
+    </section>
+  </section>
+
+  <footer>Verilerin Firebase üzerinde saklanır. Bir geziyi yalnızca gezideki kişiler görebilir.</footer>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
