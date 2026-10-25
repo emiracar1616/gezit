@@ -18,6 +18,8 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
       - name: Bağımlılıkları kur
         run: npm install
       - name: Mantık testleri
