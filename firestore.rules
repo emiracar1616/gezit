@@ -4,52 +4,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
-      return request.auth != null;
+    // Giriş yapmış ve e-postasını doğrulamış kullanıcı
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // Herkese açık profil: yalnızca görünen ad. Liste çekmek yasak, tek tek okunabilir.
+    // Kullanıcı profili: ad, nickname, avatar (emoji ya da küçük fotoğraf), IBAN
     match /users/{uid} {
-      allow get: if signedIn();
+      allow get: if verified();
       allow list: if false;
-      allow create, update: if signedIn()
+
+      allow create: if verified()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'nick', 'createdAt', 'updatedAt', 'emoji', 'photo', 'iban'])
         && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 40;
-      allow delete: if signedIn() && request.auth.uid == uid;
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.nick is string
+        && request.resource.data.nick.matches('^[a-z0-9_]{3,20}$')
+        && request.resource.data.createdAt is int;
+
+      // Nickname sonradan değiştirilemez; diğer alanlar güncellenebilir
+      allow update: if verified()
+        && request.auth.uid == uid
+        && request.resource.data.nick == resource.data.nick
+        && request.resource.data.keys().hasOnly(['name', 'nick', 'createdAt', 'updatedAt', 'emoji', 'photo', 'iban'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && (!('emoji' in request.resource.data) || (request.resource.data.emoji is string && request.resource.data.emoji.size() <= 16))
+        && (!('photo' in request.resource.data) || request.resource.data.photo == null
+            || (request.resource.data.photo is string && request.resource.data.photo.size() <= 150000))
+        && (!('iban' in request.resource.data) || request.resource.data.iban == null
+            || (request.resource.data.iban is string && request.resource.data.iban.size() <= 40));
+
+      allow delete: if verified() && request.auth.uid == uid;
     }
 
-    // E-posta -> kullanıcı kimliği eşlemesi (arkadaşı e-postayla bulmak için).
-    // Liste çekmek yasak: yalnızca tam e-posta adresini bilen kişi sorgulayabilir.
-    match /emails/{email} {
-      allow get: if signedIn();
+    // Nickname -> kullanıcı kimliği. Doc kimliği nickname olduğu için aynı ad iki kez oluşturulamaz.
+    match /usernames/{nick} {
+      allow get: if verified();
       allow list: if false;
-      allow create, update: if signedIn()
-        && request.auth.token.email != null
-        && email == request.auth.token.email.lower()
+      allow create: if verified()
+        && nick.matches('^[a-z0-9_]{3,20}$')
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.uid == request.auth.uid;
-      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+      allow delete: if verified() && resource.data.uid == request.auth.uid;
     }
 
     match /trips/{tripId} {
       // Geziyi yalnızca üyeleri okuyabilir
-      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+      allow read: if verified() && request.auth.uid in resource.data.memberIds;
 
-      allow create: if signedIn()
+      allow create: if verified()
         && request.resource.data.keys().hasOnly(['name', 'currency', 'ownerId', 'memberIds', 'at'])
         && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.memberIds is list
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.memberIds.size() <= 30
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.name.size() <= 50
         && request.resource.data.currency in ['₺', '€', '$', '£']
         && request.resource.data.at is int;
 
-      allow update: if signedIn() && (
-        // Sahibi: yalnızca üye listesini değiştirebilir (ekle/çıkar)
+      allow update: if verified() && (
+        // Sahibi: yalnızca üye listesini değiştirebilir
         (resource.data.ownerId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
           && request.auth.uid in request.resource.data.memberIds
@@ -63,39 +82,41 @@ service cloud.firestore {
              resource.data.memberIds.toSet().difference([request.auth.uid].toSet()))
       );
 
-      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow delete: if verified() && resource.data.ownerId == request.auth.uid;
 
       match /expenses/{expId} {
         function trip() {
           return get(/databases/$(database)/documents/trips/$(tripId)).data;
         }
 
+        // receipt: isteğe bağlı fiş fotoğrafı (küçük, base64 metin) ya da null
         function validExpense(d) {
-          return d.keys().hasOnly(['desc', 'amount', 'payerId', 'amongIds', 'by', 'at'])
+          return d.keys().hasOnly(['desc', 'amount', 'payerId', 'amongIds', 'by', 'at', 'receipt', 'updatedAt'])
             && d.desc is string && d.desc.size() > 0 && d.desc.size() <= 60
             && d.amount is int && d.amount > 0 && d.amount <= 100000000000
             && d.payerId in trip().memberIds
             && d.amongIds is list && d.amongIds.size() > 0
             && d.amongIds.toSet().difference(trip().memberIds.toSet()).size() == 0
             && d.by is string
-            && d.at is int;
+            && d.at is int
+            && (!('receipt' in d) || d.receipt == null || (d.receipt is string && d.receipt.size() <= 400000));
         }
 
-        allow read: if signedIn() && request.auth.uid in trip().memberIds;
+        allow read: if verified() && request.auth.uid in trip().memberIds;
 
-        allow create: if signedIn()
+        allow create: if verified()
           && request.auth.uid in trip().memberIds
           && request.resource.data.by == request.auth.uid
           && validExpense(request.resource.data);
 
         // Harcamayı ekleyen kişi ya da gezi sahibi düzenleyebilir
-        allow update: if signedIn()
+        allow update: if verified()
           && request.auth.uid in trip().memberIds
           && (resource.data.by == request.auth.uid || trip().ownerId == request.auth.uid)
           && request.resource.data.by == resource.data.by
           && validExpense(request.resource.data);
 
-        allow delete: if signedIn()
+        allow delete: if verified()
           && (resource.data.by == request.auth.uid || trip().ownerId == request.auth.uid);
       }
     }
