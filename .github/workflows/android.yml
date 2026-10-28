@@ -20,7 +20,6 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
 
       - name: Bağımlılıkları kur
         run: npm install
