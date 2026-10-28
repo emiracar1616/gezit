@@ -1,0 +1,70 @@
+name: Google Play AAB (imzalı)
+
+# Google Play'e yüklenecek imzalı paketi (AAB) üretir.
+# Gerekli GitHub Secrets (Settings > Secrets and variables > Actions):
+#   KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Sürüm kodu (her yüklemede bir artmalı, ör. 2)'
+        required: true
+        default: '2'
+      version_name:
+        description: 'Sürüm adı (ör. 1.1.0)'
+        required: true
+        default: '1.1.0'
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Bağımlılıkları kur ve test et
+        run: |
+          npm install
+          npm test
+          npm run build
+
+      - name: Android projesini oluştur
+        run: |
+          npx cap add android
+          cp android-config/google-services.json android/app/google-services.json
+          npx cap sync android
+
+      - name: İmza anahtarını çöz
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Gradle'ı imza ve sürüm için ayarla
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: python3 scripts/patch-android.py android/app/build.gradle "${{ inputs.version_code }}" "${{ inputs.version_name }}"
+
+      - name: AAB derle
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gezi-hesabi-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
